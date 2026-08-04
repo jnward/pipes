@@ -183,7 +183,7 @@ STATE::CalcTexRepFactors()
         //put smallest rep factors in texRep[0]; (mf:this is ok for now, as
         // flex pipes and normal pipes don't coexist)
     
-        for( i = 1; i < nTextures; i++ ) {
+        for( int i = 1; i < nTextures; i++ ) {  /* PORT: MSVC for-scope fix, see PATCHES.md */
             if( texRep[i].x < texRep[0].x )
                 texRep[0].x = texRep[i].x;
             if( texRep[i].y < texRep[0].y )
@@ -210,7 +210,8 @@ STATE::LoadTextureFiles( TEXFILE *pTexFile, int nTexFiles, TEX_RES *pTexRes )
     // Try to load the bmp or rgb file
 
     // i counts successfully loaded textures
-    for( int i = 0; nTexFiles; nTexFiles-- ) {
+    int i;  /* PORT: MSVC for-scope fix, see PATCHES.md */
+    for( i = 0; nTexFiles; nTexFiles-- ) {
         if( ss_LoadTextureFile( &pTexFile[i], &texture[i] ) )  {
             // If texture object extension, set tex params here for each object
             if( ss_TextureObjectsEnabled() )
@@ -685,7 +686,8 @@ STATE::Draw(void *data)
 
     DRAW_THREAD *pThread = drawThreads;
 
-    for( int i = 0; i < nDrawThreads; i++, pThread++  ) {
+    int i;  /* PORT: MSVC for-scope fix, see PATCHES.md */
+    for( i = 0; i < nDrawThreads; i++, pThread++  ) {
         if( pThread->pPipe->IsStuck() ) {
             if( ++nPipesDrawn > maxPipesPerFrame ) {
                 // Reaching pipe saturation - kill this pipe thread

@@ -181,7 +181,7 @@ CalibrateClear( int width, int height, float fClearTime )
     // Adjust size of rects for ideal clear time
 
     if( elapsed <= 0.0f ) {
-        rectSize = 1;
+        rectSize = 4;   /* PORT: was 1; see PATCHES.md (WebGL async timing) */
         return rectSize;
     }
 
@@ -189,8 +189,8 @@ CalibrateClear( int width, int height, float fClearTime )
     factor = fClearTime / elapsed;
     idealNRects = (int) (factor * (float)nRects);
     rectSize = (int) (sqrt( (double)(width*height) / (double)idealNRects ) + 0.5);
-    if( rectSize == 0 )
-        rectSize = 1;
+    if( rectSize < 4 )
+        rectSize = 4;   /* PORT: was ==0 -> 1; see PATCHES.md (WebGL async timing) */
 
     return rectSize;
 }

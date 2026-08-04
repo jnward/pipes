@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>3D Pipes (OpenGL)</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+  }
+  #canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    cursor: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+  // Settings use the original registry value names ([Screen Saver.3DPipes]
+  // in control.ini).  Values here are the NT4 out-of-the-box configuration.
+  // Edit before load, or use the URL query string, e.g.:
+  //   ?Flex=1&JointType=0&SurfStyle=1&Tesselation=200&Seed=12345
+  //
+  //   JointType:      0=Elbow 1=Ball 2=Mixed 3=Cycle   (normal pipes only)
+  //   SurfStyle:      0=Solid 1=Textured (STRIPE.BMP) 2=Wireframe(unsupported)
+  //   TextureQuality: 0=Default(nearest) 1=High(linear)
+  //   Tesselation:    0..200  (100 -> original mid-slider default)
+  //   Flex:           0=Normal pipes  1=Flex (curvy) pipes
+  //   MultiPipes:     0=Single pipe   1=Multiple pipes (2..4 at once)
+  //   Seed:           RNG seed (MSVC LCG) for reproducible runs; omit for
+  //                   time-seeded behavior like the original (srand(millitm))
+  window.PIPES_CONFIG = {
+    JointType: 2,
+    SurfStyle: 0,
+    TextureQuality: 0,
+    Tesselation: 100,
+    Flex: 0,
+    MultiPipes: 1,
+    // Seed: 12345,
+  };
+
+  // URL query overrides
+  (function () {
+    var q = new URLSearchParams(location.search);
+    ['JointType', 'SurfStyle', 'TextureQuality', 'Tesselation',
+     'Flex', 'MultiPipes', 'Seed'].forEach(function (k) {
+      if (q.has(k)) window.PIPES_CONFIG[k] = parseInt(q.get(k), 10);
+    });
+  })();
+
+  var Module = {
+    canvas: document.getElementById('canvas'),
+  };
+
+  // Match the original's WM_SIZE -> Reshape path on window resize.
+  window.addEventListener('resize', function () {
+    if (!Module._pipes_resize) return;
+    var c = Module.canvas;
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+    Module._pipes_resize(c.width, c.height);
+  });
+</script>
+<script src="dist/sspipes.js"></script>
+</body>
+</html>
