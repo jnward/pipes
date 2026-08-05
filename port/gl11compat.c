@@ -559,7 +559,10 @@ static void execEvalMesh2(GLenum mode, GLint i1, GLint i2, GLint j1, GLint j2)
 #ifndef GL_SCISSOR_TEST
 #define GL_SCISSOR_TEST 0x0C11
 #endif
-static int gScissorOn = 0;   /* only CLEAR.CXX's wipe/dissolve use scissor */
+static int    gScissorOn = 0; /* only CLEAR.CXX's wipe/dissolve use scissor */
+static double gClearStart = 0.0;   /* pacing state for the dissolve clear */
+static int    gClearRects = 0;
+static double gLastYield  = 0.0;
 
 static int isInternalCap(GLenum cap)
 {
@@ -579,8 +582,14 @@ static void execEnable(GLenum cap, int on)
          * fixed-function normal rescaling is handled by the emulation's
          * shader path, so nothing further to do. */
     default:
-        if (cap == GL_SCISSOR_TEST)
+        if (cap == GL_SCISSOR_TEST) {
             gScissorOn = on;
+            if (on) {   /* a dissolve/wipe clear begins: reset pacing */
+                gClearStart = emscripten_get_now();
+                gClearRects = 0;
+                gLastYield  = gClearStart;
+            }
+        }
         if (on) glEnable(cap); else glDisable(cap);
     }
 }
@@ -760,23 +769,48 @@ void pipes_glMaterialf(GLenum face, GLenum pname, GLfloat val)
 
 extern void glFlush(void);
 
+/* Suspend until the next display frame (vsync-aligned, unlike
+ * emscripten_sleep's setTimeout, whose wakeups drift against the
+ * refresh and make the dissolve pacing visibly uneven). */
+EM_ASYNC_JS(void, pipesWaitForFrame, (void), {
+    await new Promise(function (resolve) { requestAnimationFrame(resolve); });
+});
+
+/* Emulated scissored-clear throughput, rects/second.  The original's
+ * CalibrateClear assumed the HARDWARE was the rate limiter: it timed a
+ * baseline clear and sized the dissolve rects so the wipe lasted
+ * ~fClearTime (2s).  A modern GPU retires tens of thousands of scissored
+ * clears per frame, which collapses the dissolve into a few huge steps.
+ * Pacing the clears at a fixed period-plausible rate restores the
+ * feedback loop: calibration measures this rate, picks small rects
+ * (4-9 px at typical sizes), and the dissolve runs ~2s of fine speckle,
+ * exactly as the math intended on 1996 hardware. */
+#define DISSOLVE_RECTS_PER_SEC 12000.0
+
 void pipes_glFlush(void)
 {
     /* The original renders single-buffered: glFlush made progress visible
      * immediately, which is what animates CLEAR.CXX's digital-dissolve
      * scene wipe (a flush after every scissored rectangle).  A browser
      * composites only when the JS task yields, so during scissored
-     * clears we suspend via ASYNCIFY at most every ~10ms — the dissolve
-     * becomes visible again, and CalibrateClear's timing loop measures
-     * real elapsed time as designed.  The per-pipe flushes of normal
-     * drawing (scissor off) never yield, preserving the tick cadence. */
+     * clears we suspend via ASYNCIFY, aligned to display frames: ahead
+     * of the pacing schedule we wait for the next frame; behind it we
+     * still yield every ~6ms of busy time so each refresh presents one
+     * bounded batch.  The per-pipe flushes of normal drawing (scissor
+     * off) never yield, preserving the tick cadence. */
     glFlush();
     if (gScissorOn) {
-        static double lastYield = 0.0;
-        double now = emscripten_get_now();
-        if (now - lastYield >= 10.0) {
-            lastYield = now;
-            emscripten_sleep(0);
+        gClearRects++;
+        double target = gClearStart +
+                        gClearRects * (1000.0 / DISSOLVE_RECTS_PER_SEC);
+        if (emscripten_get_now() < target) {
+            do {
+                pipesWaitForFrame();
+            } while (emscripten_get_now() < target);
+            gLastYield = emscripten_get_now();
+        } else if (emscripten_get_now() - gLastYield >= 6.0) {
+            pipesWaitForFrame();
+            gLastYield = emscripten_get_now();
         }
     }
 }

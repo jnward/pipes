@@ -7,13 +7,18 @@ observable difference, and why.
 1. **The dissolve scene wipe is animated via ASYNCIFY suspension.**
    The original renders single-buffered to the front buffer, so the
    digital-dissolve scene clear (CLEAR.CXX) appeared progressively,
-   `glFlush` by `glFlush`.  A browser composites only when the JS task
-   yields, so the port's `glFlush` (during scissored clears only)
-   suspends the wasm via emscripten ASYNCIFY at most every ~10 ms —
-   the dissolve draws progressively again and `CalibrateClear`'s timing
-   loop measures real elapsed time as designed.  Pacing is close to,
-   but not cycle-identical with, a given 1996 machine (it depends on
-   per-rect cost in the browser); the calibration clamp in PATCHES.md
+   `glFlush` by `glFlush`, and `CalibrateClear` sized the rects so the
+   hardware's fill rate stretched the wipe to ~2 s.  A modern GPU
+   retires tens of thousands of scissored clears per frame, which would
+   collapse the dissolve into a few huge steps, so the port paces
+   scissored clears at a fixed period-plausible rate (12,000 rects/s,
+   `DISSOLVE_RECTS_PER_SEC` in port/gl11compat.c), suspending via
+   ASYNCIFY aligned to display frames (`requestAnimationFrame`, so each
+   refresh presents one even batch).  The original calibration loop
+   then works exactly as designed: it measures the emulated rate,
+   picks fine rects, and the dissolve runs a smooth ~2 s speckle.
+   Duration varies with per-frame compositor overhead the same way it
+   varied with GPU speed in 1996; the calibration clamp in PATCHES.md
    still applies.
 
 2. **Mid-tick partial drawing is not visible.**
