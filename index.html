@@ -39,13 +39,17 @@
   //                   runs; omit for time-seeded behavior like the original
   //                   (srand(millitm)).  Seeds with bit 31 set can only be
   //                   fed via Module._msvc_srand.
+  // These are the fresh-NT4 defaults (no registry: one pipe grows at a
+  // time, elbow joints, solid, coarse tesselation).  For the popular
+  // multi-pipe look with mixed joints (and teapot odds):
+  //   ?MultiPipes=1&JointType=2
   window.PIPES_CONFIG = {
-    JointType: 2,
+    JointType: 0,
     SurfStyle: 0,
     TextureQuality: 0,
-    Tesselation: 100,
+    Tesselation: 0,
     Flex: 0,
-    MultiPipes: 1,
+    MultiPipes: 0,
     // Seed: 12345,
   };
 

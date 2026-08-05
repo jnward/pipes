@@ -28,8 +28,10 @@ Settings ride the URL (original `control.ini` value names):
                                  srand(millitm), like the original)
 ```
 
-Defaults match an NT4 machine: up to 4 simultaneous pipes, mixed
-joints, solid surface.
+Defaults match a fresh NT4 machine (no saved settings): one pipe
+growing at a time, elbow joints, solid surface.  The popular
+multi-pipe/mixed-joints configuration — required for teapot odds — is
+`?MultiPipes=1&JointType=2`.
 
 ## What's in the repo
 

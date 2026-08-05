@@ -116,7 +116,11 @@ emcc -c -O2 -Iport/shim -Iport port/ssshell.c -o build/obj/ssshell.o
 
 echo "==> linking dist/sspipes.js"
 mkdir -p dist
+# ASYNCIFY lets the dissolve-clear's per-rect glFlush suspend to the
+# compositor (port/gl11compat.c pipes_glFlush) so the scene wipe is
+# visible, as on the original's front-buffer rendering.
 em++ build/obj/*.o dl/glu-9.0.3/build/libgluutil.a -O2 \
+    -sASYNCIFY -sASYNCIFY_STACK_SIZE=32768 \
     -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sALLOW_MEMORY_GROWTH=1 \
     -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE='$Browser' \
     -sEXPORTED_FUNCTIONS=_main,_pipes_set_setting,_pipes_set_texture_path,_pipes_resize,_msvc_srand,_malloc,_free,_pipes_debug_matrices \

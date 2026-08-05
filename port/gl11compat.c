@@ -40,6 +40,7 @@
 #include <string.h>
 #include <math.h>
 #include <GL/gl.h>
+#include <emscripten/emscripten.h>
 
 /* Declarations for the JS legacy-GL emulation functions we call.
  * These are unshadowed: nothing native defines them, so they resolve to
@@ -276,7 +277,9 @@ void glNewList(GLuint list, GLenum mode)
     }
     if (mode != GL_COMPILE)
         fprintf(stderr, "gl11compat: glNewList: only GL_COMPILE supported\n");
-    gLists[list - 1].count = 0;   /* redefinition replaces */
+    for (int k = 0; k < gLists[list - 1].count; k++)
+        free(gLists[list - 1].cmds[k].map);   /* redefinition replaces */
+    gLists[list - 1].count = 0;
     gRecording = (int)list;
 }
 
@@ -533,19 +536,30 @@ static void execEvalMesh2(GLenum mode, GLint i1, GLint i2, GLint j1, GLint j2)
     }
     GLfloat du = (cx->eval.gu2 - cx->eval.gu1) / (GLfloat)cx->eval.un;
     GLfloat dv = (cx->eval.gv2 - cx->eval.gv1) / (GLfloat)cx->eval.vn;
+    /* spec: at i==un / j==vn the domain endpoint must be hit exactly
+     * (i*du + u1 can miss u2 by an ulp) */
+    #define EVAL_U(i) ((i) == cx->eval.un ? cx->eval.gu2 : cx->eval.gu1 + (i) * du)
+    #define EVAL_V(j) ((j) == cx->eval.vn ? cx->eval.gv2 : cx->eval.gv1 + (j) * dv)
     for (GLint j = j1; j < j2; j++) {
         execBegin(GL_TRIANGLE_STRIP);   /* == GL_QUAD_STRIP geometry */
         for (GLint i = i1; i <= i2; i++) {
-            evalCoord2Emit(cx->eval.gu1 + i * du, cx->eval.gv1 + j * dv);
-            evalCoord2Emit(cx->eval.gu1 + i * du, cx->eval.gv1 + (j + 1) * dv);
+            evalCoord2Emit(EVAL_U(i), EVAL_V(j));
+            evalCoord2Emit(EVAL_U(i), EVAL_V(j + 1));
         }
         execEnd();
     }
+    #undef EVAL_U
+    #undef EVAL_V
 }
 
 /* =====================================================================
  * Enable/disable interception (evaluator caps stay internal)
  * ===================================================================== */
+
+#ifndef GL_SCISSOR_TEST
+#define GL_SCISSOR_TEST 0x0C11
+#endif
+static int gScissorOn = 0;   /* only CLEAR.CXX's wipe/dissolve use scissor */
 
 static int isInternalCap(GLenum cap)
 {
@@ -565,6 +579,8 @@ static void execEnable(GLenum cap, int on)
          * fixed-function normal rescaling is handled by the emulation's
          * shader path, so nothing further to do. */
     default:
+        if (cap == GL_SCISSOR_TEST)
+            gScissorOn = on;
         if (on) glEnable(cap); else glDisable(cap);
     }
 }
@@ -740,6 +756,29 @@ void pipes_glMaterialf(GLenum face, GLenum pname, GLfloat val)
 {
     RECORD_OR_EXEC({ c.op = OP_MATERIALF; c.e1 = face; c.e2 = pname;
                      c.f[0] = val; });
+}
+
+extern void glFlush(void);
+
+void pipes_glFlush(void)
+{
+    /* The original renders single-buffered: glFlush made progress visible
+     * immediately, which is what animates CLEAR.CXX's digital-dissolve
+     * scene wipe (a flush after every scissored rectangle).  A browser
+     * composites only when the JS task yields, so during scissored
+     * clears we suspend via ASYNCIFY at most every ~10ms — the dissolve
+     * becomes visible again, and CalibrateClear's timing loop measures
+     * real elapsed time as designed.  The per-pipe flushes of normal
+     * drawing (scissor off) never yield, preserving the tick cadence. */
+    glFlush();
+    if (gScissorOn) {
+        static double lastYield = 0.0;
+        double now = emscripten_get_now();
+        if (now - lastYield >= 10.0) {
+            lastYield = now;
+            emscripten_sleep(0);
+        }
+    }
 }
 
 extern void glTexParameteri(GLenum target, GLenum pname, GLint param);

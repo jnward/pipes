@@ -78,14 +78,16 @@ matching the original build's language modes.
     (musl says `0x7fffffff`, which rescales every probability in
     `ss_iRand`/`ss_iRand2`/`ss_fRand` to ~zero: no elbow/ball mix, no
     teapot odds, no flex variation);
-  - renames 18 GL immediate-mode/state calls (`glBegin`, `glVertex3f`,
-    `glEnable`, `glMaterialfv`, ...) to the `pipes_gl*` entry points of
-    `port/gl11compat.c`, which supplies what emscripten's
-    `-sLEGACY_GL_EMULATION` lacks: display lists, GL 1.x evaluators
-    (`glMap2f`/`glMapGrid2f`/`glEvalMesh2` + `GL_AUTO_NORMAL`),
-    `GL_QUAD_STRIP`/`GL_POLYGON` begin modes, per-vertex re-emission of
-    current normal/texcoord (the emulation's interleaved stream can't
-    express GL's current-attribute model), and virtual WGL contexts.
+  - renames 20 GL immediate-mode/state calls (`glBegin`, `glVertex3f`,
+    `glEnable`, `glMaterialfv`, `glTexParameteri`, `glFlush`, ...) to
+    the `pipes_gl*` entry points of `port/gl11compat.c`, which supplies
+    what emscripten's `-sLEGACY_GL_EMULATION` lacks: display lists,
+    GL 1.x evaluators (`glMap2f`/`glMapGrid2f`/`glEvalMesh2` +
+    `GL_AUTO_NORMAL`), `GL_QUAD_STRIP`/`GL_POLYGON` begin modes,
+    per-vertex re-emission of current normal/texcoord (the emulation's
+    interleaved stream can't express GL's current-attribute model),
+    virtual WGL contexts, and the ASYNCIFY-suspending `glFlush` that
+    makes the dissolve wipe visible (WEB-DIFFERENCES.md #1).
 
 ## Filesystem accommodations (no source edits)
 

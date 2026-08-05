@@ -157,20 +157,22 @@ BOOL ss_RedrawDesktop(void) { return TRUE; }
 /* ---- settings store ----
  * Key names and section are exactly what the original wrote to
  * control.ini / registry (PIPES/SSPIPES.RC stringtable).  Values here are
- * the NT4 out-of-the-box configuration of the shipped sspipes.scr
- * (multiple pipes, mixed joints, solid surface, mid tesselation).
- * The SDK sample's compiled-in fallbacks (single pipe, elbow joints) apply
- * only when a value is removed from this store AND the code's iDefault is
- * used; see PATCHES.md "Settings" for discussion. */
+ * the fresh-NT4 out-of-the-box behavior: with no registry entries,
+ * getIniSettings' iDefault fallbacks apply (PIPES/DIALOG.C:83-95 —
+ * single pipe growing at a time, elbow joints, solid surface,
+ * tesselation 0), and this store boots with exactly those values.
+ * The popular multi-pipe/mixed-joints configuration is one URL away
+ * (?MultiPipes=1&JointType=2; mixed joints are required for the teapot
+ * easter egg). */
 typedef struct { const char *key; int val; int present; } PROFILE_INT;
 
 static PROFILE_INT gProfile[] = {
-    { "JointType",      2, 1 },   /* JOINT_MIXED */
+    { "JointType",      0, 1 },   /* JOINT_ELBOW */
     { "SurfStyle",      0, 1 },   /* SURFSTYLE_SOLID */
     { "TextureQuality", 0, 1 },   /* TEXQUAL_DEFAULT */
-    { "Tesselation",  100, 1 },   /* -> fTesselFact 1.0 -> 12 slices */
+    { "Tesselation",    0, 1 },   /* -> fTesselFact 0.0 -> 8 slices */
     { "Flex",           0, 1 },   /* normal (non-flex) pipes */
-    { "MultiPipes",     1, 1 },   /* up to MAX_DRAW_THREADS=4 pipes */
+    { "MultiPipes",     0, 1 },   /* one pipe grows at a time */
     { "TextureCount",   0, 1 },
     { "TextureFileOffset", 0, 1 },
 };
@@ -550,9 +552,17 @@ void pipes_debug_matrices(void)
 static void tick(void)
 {
     /* SSWPROC.CXX WM_TIMER -> ss_TimerProc -> SSW::Update ->
-     * (single-buffer, non-floater path) (*UpdateFunc)(DataPtr)   */
+     * (single-buffer, non-floater path) (*UpdateFunc)(DataPtr).
+     * The busy guard mirrors ss_TimerProc's (SSWPROC.CXX:448-477); with
+     * ASYNCIFY a tick can suspend mid-dissolve and further timer
+     * callbacks must not re-enter the draw. */
+    static int busy = 0;
+    if (busy)
+        return;
+    busy = 1;
     if (gUpdateFunc)
         (*gUpdateFunc)(gDataPtr);
+    busy = 0;
 }
 
 EMSCRIPTEN_KEEPALIVE

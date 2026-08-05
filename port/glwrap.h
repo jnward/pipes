@@ -47,5 +47,6 @@
 #define glMaterialfv  pipes_glMaterialfv
 #define glMaterialf   pipes_glMaterialf
 #define glTexParameteri pipes_glTexParameteri
+#define glFlush       pipes_glFlush
 
 #endif

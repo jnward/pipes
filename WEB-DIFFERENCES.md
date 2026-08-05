@@ -4,15 +4,17 @@ The simulation, geometry, RNG stream and defaults are the original
 code's.  These are the places where the browser platform forces an
 observable difference, and why.
 
-1. **The dissolve/wipe clears are not visible as animations.**
+1. **The dissolve scene wipe is animated via ASYNCIFY suspension.**
    The original renders single-buffered to the front buffer, so the
-   digital-dissolve scene clear (CLEAR.CXX) appeared progressively over
-   ~2 seconds, `glFlush` by `glFlush`.  A browser composites the canvas
-   only when the JS task yields; the whole dissolve runs inside one
-   16 ms tick, so a scene reset appears as an instant clear.  Making it
-   visible would require rewriting `STATE::FrameReset`'s synchronous
-   structure — exactly the kind of edit this port refuses to make.
-   Related: the calibration clamp documented in PATCHES.md.
+   digital-dissolve scene clear (CLEAR.CXX) appeared progressively,
+   `glFlush` by `glFlush`.  A browser composites only when the JS task
+   yields, so the port's `glFlush` (during scissored clears only)
+   suspends the wasm via emscripten ASYNCIFY at most every ~10 ms —
+   the dissolve draws progressively again and `CalibrateClear`'s timing
+   loop measures real elapsed time as designed.  Pacing is close to,
+   but not cycle-identical with, a given 1996 machine (it depends on
+   per-rect cost in the browser); the calibration clamp in PATCHES.md
+   still applies.
 
 2. **Mid-tick partial drawing is not visible.**
    Same mechanism: the original's per-pipe `glFlush` (STATE.CXX:736,
@@ -90,11 +92,12 @@ observable difference, and why.
     for up to one tick new segments may draw with the previous viewport
     until `FrameReset` re-establishes projection and node grid.
 
-12. **Config-dialog defaults vs. shipped defaults.** With no registry,
-    the SDK sample's compiled-in defaults are single pipe, elbow
-    joints, tesselation 0.  The famous NT4 look (up to 4 simultaneous
-    pipes, mixed joints) came from registry values.  The port's
-    settings store boots with `MultiPipes=1`, `JointType=2` (mixed),
-    `Tesselation=100` (12 slices — the mid-slider value); all overridable per run from
-    `window.PIPES_CONFIG` / the URL query string, including down to the
-    SDK fallbacks.
+12. **Defaults.** The port boots with the fresh-NT4 (no registry)
+    behavior the code itself specifies: ONE pipe growing at a time
+    (5 per scene), elbow joints, solid surface, tesselation 0
+    (getIniSettings fallbacks, PIPES/DIALOG.C:83-95).  The widely
+    remembered multi-pipe configuration (2-4 simultaneous pipes, mixed
+    joints — the mode where teapots can appear) corresponds to saved
+    settings and is one URL away: `?MultiPipes=1&JointType=2`.
+    Everything is overridable per run from `window.PIPES_CONFIG` / the
+    URL query string.
