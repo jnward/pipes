@@ -4,9 +4,21 @@ The `original/` tree is the Windows NT 4.0 SDK sample source, extracted
 verbatim from `MSTOOLS/SAMPLES/OPENGL/SCRSAVE` and
 `MSTOOLS/SAMPLES/OPENGL/GLAUX` on the Win32 SDK ISO (August 1996;
 archive.org item `msdn-disc9-august-1996-0896-partno-92908`,
-`1_WIN32SDK.iso`).  The first commit of this repository contains the
-pristine extraction, so `git log -p -- original/` shows the exact diff of
-every change below.
+`1_WIN32SDK.iso`).
+
+Provenance/audit trail:
+- **SCRSAVE**: the repository's first commit (`b79e6a5`) contains the
+  pristine extraction, so `git log -p -- original/MSTOOLS/SAMPLES/OPENGL/SCRSAVE`
+  shows the exact diff of every change below.
+- **GLAUX**: added in the port commit (it was extracted later in the
+  session), so git history alone does not prove it pristine.  It is
+  byte-for-byte identical to a fresh `7z` extraction of the ISO
+  (verified with `diff -r`); the committed tree is completely unmodified.
+  To re-verify: extract `MSTOOLS/SAMPLES/OPENGL/GLAUX` from the ISO and
+  `diff -r` against `original/MSTOOLS/SAMPLES/OPENGL/GLAUX`.
+  SHA-256 of the two files the build compiles or includes:
+  `TEAPOT.C  cfd97822b2db9289602a711e60bd16fb76c65f914acfd2f550b064252604e2dc`,
+  `TEAPOT.H  8535fb7ed8e007f72f8322cd38a9ab8937a9e035c54bd7db23dab0a28ae42651`.
 
 The porting rule was: **never touch simulation or drawing logic**.  All
 Win32 scaffolding lives in replacement files under `port/`; the handful
@@ -39,16 +51,22 @@ done — so the measured `elapsed` is ~0 and the computed `rectSize`
 becomes 1.  At modern resolutions that is hundreds of thousands of
 scissored clear+flush calls inside a single animation tick (tens of
 seconds of frozen tab).  Both assignments that could produce a
-pathological size now clamp to a minimum of 4 pixels, squarely inside
-the range real period hardware produced.  The dissolve's code path and
-its `ss_iRand` consumption pattern are otherwise untouched.
+pathological size now clamp to a minimum of 4 pixels.  Consequence:
+dissolve granularities of 1–3 px are unreachable in the port — but in
+the browser any rectSize below 4 can only arise from the meaningless
+near-zero timing measurement, never from an honest calibration, and the
+dissolve is invisible inside a single tick regardless (see
+WEB-DIFFERENCES.md #1).  The dissolve's code path and its `ss_iRand`
+consumption pattern are otherwise untouched.
 
 Marked with `/* PORT: ... */` comments at both sites.
 
 ## Compile-time renames (no source edits)
 
-These apply to every original translation unit via the compiler command
-line (see `build.sh`); the source text is unchanged.
+These apply to every original translation unit the port compiles, via
+the compiler command line (see `build.sh`); the source text is
+unchanged.  `.c` originals are compiled as C (`emcc`) and `.cxx` as C++,
+matching the original build's language modes.
 
 - `-Drand=msvc_rand -Dsrand=msvc_srand` — routes the CRT RNG to MSVC's
   exact LCG (`seed*214013+2531011`, returns `(seed>>16)&0x7fff`),

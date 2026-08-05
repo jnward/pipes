@@ -35,8 +35,10 @@
   //   Tesselation:    0..200  (100 -> original mid-slider default)
   //   Flex:           0=Normal pipes  1=Flex (curvy) pipes
   //   MultiPipes:     0=Single pipe   1=Multiple pipes (2..4 at once)
-  //   Seed:           RNG seed (MSVC LCG) for reproducible runs; omit for
-  //                   time-seeded behavior like the original (srand(millitm))
+  //   Seed:           RNG seed, 0..2147483647 (MSVC LCG) for reproducible
+  //                   runs; omit for time-seeded behavior like the original
+  //                   (srand(millitm)).  Seeds with bit 31 set can only be
+  //                   fed via Module._msvc_srand.
   window.PIPES_CONFIG = {
     JointType: 2,
     SurfStyle: 0,

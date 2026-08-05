@@ -85,19 +85,21 @@ echo "==> compiling original PIPES sources"
 for f in node xc objects eval view pipe npipe fpipe nstate fstate state sspipes; do
     em++ -c $CFLAGS_ORIG "build/lc/pipes/$f.cxx" -o "build/obj/$f.o"
 done
-em++ -c $CFLAGS_ORIG build/lc/pipes/dialog.c -o build/obj/dialog.o
+# .c files are compiled as C (emcc), matching the original build's language mode
+emcc -c $CFLAGS_ORIG build/lc/pipes/dialog.c -o build/obj/dialog.o
 
 echo "==> compiling original COMMON sources"
 for f in util.cxx clear.cxx; do
     em++ -c $CFLAGS_ORIG "build/lc/common/$f" -o "build/obj/common_${f%.*}.o"
 done
 for f in material.c math.c color.c texture.c dialog.c; do
-    em++ -c $CFLAGS_ORIG "build/lc/common/$f" -o "build/obj/common_${f%.*}.o"
+    emcc -c $CFLAGS_ORIG "build/lc/common/$f" -o "build/obj/common_${f%.*}.o"
 done
 
 echo "==> compiling original GLAUX teapot"
-em++ -c -O2 -Iport/shim -Ibuild/lc/common -Ibuild/lc/glaux \
-    -include port/glwrap.h -Wno-nonportable-include-path -Wno-comment \
+emcc -c -O2 -Iport/shim -Ibuild/lc/common -Ibuild/lc/glaux \
+    -include port/glwrap.h -Drand=msvc_rand -Dsrand=msvc_srand \
+    -Wno-nonportable-include-path -Wno-comment \
     build/lc/glaux/teapot.c -o build/obj/glaux_teapot.o
 
 echo "==> compiling port layer"

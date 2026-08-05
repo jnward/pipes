@@ -54,7 +54,12 @@ observable difference, and why.
    reproducibility; leaving it unset gives original behavior.
    Note that even on real Windows, decision sequences diverge across
    machines after the first scene reset, because the dissolve clear
-   consumes a hardware-speed-dependent number of `ss_iRand` calls.
+   consumes a hardware-speed-dependent number of `ss_iRand` calls; the
+   count also depends on the window resolution, so seeded runs are
+   reproducible given the same seed and canvas size, up to the first
+   timing-calibrated wipe (same caveat the original had).  The
+   `PIPES_CONFIG.Seed` field carries 31 bits; full 32-bit seeds can be
+   set through the exported `Module._msvc_srand`.
 
 8. **Multiple GL contexts are virtualized.** Each pipe "draw thread"
    gets its own `wglCreateContext` with `wglShareLists` in the
