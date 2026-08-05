@@ -54,7 +54,10 @@
     var q = new URLSearchParams(location.search);
     ['JointType', 'SurfStyle', 'TextureQuality', 'Tesselation',
      'Flex', 'MultiPipes', 'Seed'].forEach(function (k) {
-      if (q.has(k)) window.PIPES_CONFIG[k] = parseInt(q.get(k), 10);
+      if (q.has(k)) {
+        var v = parseInt(q.get(k), 10);
+        if (Number.isFinite(v)) window.PIPES_CONFIG[k] = v;
+      }
     });
   })();
 

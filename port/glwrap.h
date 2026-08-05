@@ -46,5 +46,6 @@
 #define glBindTexture pipes_glBindTexture
 #define glMaterialfv  pipes_glMaterialfv
 #define glMaterialf   pipes_glMaterialf
+#define glTexParameteri pipes_glTexParameteri
 
 #endif

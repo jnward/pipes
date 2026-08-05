@@ -31,11 +31,16 @@ if [ ! -f "$SCRSAVE/PIPES/SSPIPES.CXX" ]; then
     echo "==> original/ not present; fetching Win32 SDK ISO (~640 MB)"
     command -v 7z >/dev/null || { echo "need 7z (p7zip-full) to extract the ISO"; exit 1; }
     mkdir -p dl
-    [ -f dl/WIN32SDK.iso ] || curl -SL --retry 4 -o dl/WIN32SDK.iso "$ISO_URL"
+    [ -f dl/WIN32SDK.iso ] || curl -fSL --retry 4 -o dl/WIN32SDK.iso "$ISO_URL"
     7z x -y dl/WIN32SDK.iso "MSTOOLS/SAMPLES/OPENGL/SCRSAVE" "MSTOOLS/SAMPLES/OPENGL/GLAUX" -ooriginal >/dev/null
     echo "==> extracted $SCRSAVE"
-    echo "NOTE: a fresh extraction lacks the patches listed in PATCHES.md;"
-    echo "      use the checked-in original/ tree for the patched build."
+    if ! grep -q "PORT:" "$SCRSAVE/PIPES/STATE.CXX"; then
+        echo "ERROR: fresh extraction lacks the patches listed in PATCHES.md"
+        echo "       (MSVC for-scope fixes in STATE.CXX etc.); the build would"
+        echo "       fail at state.cxx.  Use the checked-in original/ tree, or"
+        echo "       apply the PATCHES.md edits to the extraction first."
+        exit 1
+    fi
 fi
 
 # ---- 2. emscripten -------------------------------------------------------
@@ -43,8 +48,9 @@ if ! command -v emcc >/dev/null; then
     if [ ! -d emsdk ]; then
         echo "==> installing emsdk"
         git clone --depth 1 https://github.com/emscripten-core/emsdk.git
-        ./emsdk/emsdk install latest
-        ./emsdk/emsdk activate latest
+        # pinned: the committed dist/ was built with this version
+        ./emsdk/emsdk install 6.0.5
+        ./emsdk/emsdk activate 6.0.5
     fi
     source ./emsdk/emsdk_env.sh
 fi
@@ -54,8 +60,8 @@ echo "==> using $(emcc --version | head -1)"
 if [ ! -f dl/glu-9.0.3/build/libgluutil.a ]; then
     echo "==> building mesa GLU libutil"
     mkdir -p dl
-    [ -f dl/glu-9.0.3.tar.xz ] || curl -SL --retry 3 -o dl/glu-9.0.3.tar.xz "$GLU_URL" \
-        || curl -SL --retry 3 -o dl/glu-9.0.3.tar.xz "$GLU_URL_ALT"
+    [ -f dl/glu-9.0.3.tar.xz ] || curl -fSL --retry 3 -o dl/glu-9.0.3.tar.xz "$GLU_URL" \
+        || curl -fSL --retry 3 -o dl/glu-9.0.3.tar.xz "$GLU_URL_ALT"
     tar -C dl -xf dl/glu-9.0.3.tar.xz
     mkdir -p dl/glu-9.0.3/build
     for f in dl/glu-9.0.3/src/libutil/*.c; do
@@ -68,6 +74,7 @@ fi
 
 # ---- 4. lowercase symlink farm -------------------------------------------
 mkdir -p build/lc/pipes build/lc/common build/lc/glaux build/obj
+rm -f build/obj/*.o
 for f in "$SCRSAVE"/PIPES/*;  do ln -sf "../../../$f" "build/lc/pipes/$(basename "$f"  | tr 'A-Z' 'a-z')"; done
 for f in "$SCRSAVE"/COMMON/*; do ln -sf "../../../$f" "build/lc/common/$(basename "$f" | tr 'A-Z' 'a-z')"; done
 for f in "$GLAUX"/*;          do ln -sf "../../../$f" "build/lc/glaux/$(basename "$f"  | tr 'A-Z' 'a-z')"; done

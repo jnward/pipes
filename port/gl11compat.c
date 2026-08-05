@@ -742,6 +742,22 @@ void pipes_glMaterialf(GLenum face, GLenum pname, GLfloat val)
                      c.f[0] = val; });
 }
 
+extern void glTexParameteri(GLenum target, GLenum pname, GLint param);
+
+void pipes_glTexParameteri(GLenum target, GLenum pname, GLint param)
+{
+    /* GL 1.1 allowed configuring default texture object 0 (STATE.CXX
+     * GLInit -> InitTexParams runs on fresh contexts before any bind);
+     * WebGL has no default texture and raises INVALID_OPERATION.  The
+     * default object's parameters are never used for rendering here —
+     * real texture objects are configured after glGenTextures +
+     * glBindTexture in TEXTURE.C — so drop the call when nothing is
+     * bound in the current virtual context. */
+    if (target == GL_TEXTURE_2D && CUR->boundTex2D == 0)
+        return;
+    glTexParameteri(target, pname, param);
+}
+
 void glMap2f(GLenum target, GLfloat u1, GLfloat u2, GLint ustride,
              GLint uorder, GLfloat v1, GLfloat v2, GLint vstride,
              GLint vorder, const GLfloat *points)

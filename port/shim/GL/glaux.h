@@ -5,7 +5,7 @@
  *     GLAUX source (original/MSTOOLS/SAMPLES/OPENGL/GLAUX/TEAPOT.C) on top
  *     of the GL-1.1 compatibility layer in port/gl11compat.c.
  *   - AUX_RGBImageRec + auxDIBImageLoad/auxRGBImageLoad: image loaders
- *     used by COMMON/TEXTURE.C; implemented in port/auximage.c (the
+ *     used by COMMON/TEXTURE.C; implemented in port/ssshell.c (the
  *     original TK loaders are Win32 GDI code).
  */
 #ifndef _SHIM_GLAUX_H

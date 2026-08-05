@@ -34,12 +34,19 @@ observable difference, and why.
    GL_FRONT/GL_FRONT_AND_BACK.  Pipes enables back-face culling
    (STATE.CXX:280-281), so back materials never reach the screen.
 
-5. **Wireframe surface style (`SurfStyle=2`) does not render as lines.**
+5. **User texture decoding is narrower than GDI.** The original decoded
+   any BMP Windows itself could (OS/2 core headers, RLE compression,
+   16 bpp) by routing through GDI.  The port's parser handles 1/4/8/24/
+   32 bpp uncompressed BITMAPINFOHEADER files — anything else fails
+   cleanly and falls back to the built-in STRIPE.BMP, exactly like a
+   failed load did originally.  The default texture path is unaffected.
+
+6. **Wireframe surface style (`SurfStyle=2`) does not render as lines.**
    It uses `glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)` (STATE.CXX:62),
    which neither WebGL nor the emulation supports.  It was never a
    default; solid and textured are faithful.
 
-6. **Timer granularity.** The release build re-arms a 16 ms `SetTimer`;
+7. **Timer granularity.** The release build re-arms a 16 ms `SetTimer`;
    NT4's timer actually fired at ~10–16 ms granularity depending on the
    machine.  The port uses a 16 ms `setTimeout` main loop
    (`EM_TIMING_SETTIMEOUT`), i.e. the nominal spec of the original,
@@ -47,7 +54,7 @@ observable difference, and why.
    deliberately not used: on a 120 Hz display it would double the
    animation speed.
 
-7. **RNG seeding.** `ss_RandInit` seeds with the millisecond field of
+8. **RNG seeding.** `ss_RandInit` seeds with the millisecond field of
    the wall clock (`srand(time.millitm)`, UTIL.CXX:167) — only 1000
    possible startup sequences, faithfully reproduced.  The port adds an
    optional `Seed` override (via MSVC's LCG, see PATCHES.md) for
@@ -61,7 +68,7 @@ observable difference, and why.
    `PIPES_CONFIG.Seed` field carries 31 bits; full 32-bit seeds can be
    set through the exported `Module._msvc_srand`.
 
-8. **Multiple GL contexts are virtualized.** Each pipe "draw thread"
+9. **Multiple GL contexts are virtualized.** Each pipe "draw thread"
    gets its own `wglCreateContext` with `wglShareLists` in the
    original; per-context state (accumulated modelview, material,
    texture binding, front face, evaluator enables) is shadowed and
@@ -69,18 +76,25 @@ observable difference, and why.
    the original relied on is preserved; state it never varied
    per-context (projection, lighting, depth) is shared as before.
 
-9. **Evaluator arithmetic.** Flex-pipe surfaces and the teapot go
+10. **Evaluator arithmetic.** Flex-pipe surfaces and the teapot go
    through the port's C implementation of GL 1.x 2D evaluators
    (Bernstein basis, `GL_AUTO_NORMAL` = normalized du×dv per the GL 1.1
    spec) rather than Microsoft's software OpenGL.  Same math, but not
    bit-identical floating point — differences are sub-pixel.
 
-10. **Config-dialog defaults vs. shipped defaults.** With no registry,
+11. **Resizing the browser window clears the accumulated scene.**
+    Faithful in spirit — the original's WM_SIZE also triggered a scene
+    reset (`RESET_RESIZE_BIT`) — but the mechanism differs: resizing a
+    WebGL canvas destroys the preserved drawing buffer immediately, so
+    the accumulated pipes vanish the moment the window is resized, and
+    for up to one tick new segments may draw with the previous viewport
+    until `FrameReset` re-establishes projection and node grid.
+
+12. **Config-dialog defaults vs. shipped defaults.** With no registry,
     the SDK sample's compiled-in defaults are single pipe, elbow
     joints, tesselation 0.  The famous NT4 look (up to 4 simultaneous
     pipes, mixed joints) came from registry values.  The port's
     settings store boots with `MultiPipes=1`, `JointType=2` (mixed),
-    `Tesselation=100` (16 slices — the mid-slider value matching the
-    remembered NT4 appearance); all overridable per run from
+    `Tesselation=100` (12 slices — the mid-slider value); all overridable per run from
     `window.PIPES_CONFIG` / the URL query string, including down to the
     SDK fallbacks.

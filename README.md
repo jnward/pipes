@@ -48,5 +48,10 @@ joints, solid surface.
 - `WEB-DIFFERENCES.md` — the short list of places the browser cannot
   behave exactly like 1996, and why.
 
+Building requires a case-sensitive filesystem (Linux or WSL): the
+repo tracks shim files with backslashes in their names (matching the
+originals' `#include <GL\gl.h>` directives) and a lowercase `gl -> GL`
+symlink, neither of which survives checkout on NTFS or default macOS.
+
 Microsoft SDK sample code © 1994–1996 Microsoft Corporation; teapot
 code © 1993 Silicon Graphics, Inc. (permission notice in TEAPOT.C).

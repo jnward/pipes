@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
 #include <GL/gl.h>
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
@@ -51,6 +52,20 @@
 #define IDS_TEXTURE_COUNT       1029
 #define IDS_GENNAME             9003
 #define IDS_INIFILE             9006
+#define IDS_WARNING             9014
+#define IDS_ERROR               9015
+#define IDS_BITMAP_SIZE         9016
+#define IDS_BITMAP_INVALID      9017
+#define IDS_SELECT_ANOTHER_BITMAP 9018
+#define IDS_START_FAILED        9019
+#define IDS_TEXTUREFILTER       9021
+#define IDS_TEXTUREDIALOGTITLE  9022
+#define IDS_BMP                 9023
+#define IDS_DOTBMP              9024
+#define IDS_STARDOTBMP          9025
+#define IDS_RGB                 9030
+#define IDS_DOTRGB              9031
+#define IDS_STARDOTRGB          9032
 #define IDS_TEXTURE             9126
 #define IDS_TEXTURE_FILE_OFFSET 9127
 #define IDS_TESSELATION         9130
@@ -153,11 +168,11 @@ static PROFILE_INT gProfile[] = {
     { "JointType",      2, 1 },   /* JOINT_MIXED */
     { "SurfStyle",      0, 1 },   /* SURFSTYLE_SOLID */
     { "TextureQuality", 0, 1 },   /* TEXQUAL_DEFAULT */
-    { "Tesselation",  100, 1 },   /* -> fTesselFact 1.0 -> 16 slices */
+    { "Tesselation",  100, 1 },   /* -> fTesselFact 1.0 -> 12 slices */
     { "Flex",           0, 1 },   /* normal (non-flex) pipes */
     { "MultiPipes",     1, 1 },   /* up to MAX_DRAW_THREADS=4 pipes */
     { "TextureCount",   0, 1 },
-    { "TexOffset",      0, 1 },
+    { "TextureFileOffset", 0, 1 },
 };
 #define N_PROFILE (sizeof(gProfile)/sizeof(gProfile[0]))
 
@@ -195,7 +210,23 @@ static const struct { int id; const char *str; } gStrings[] = {
     { IDS_TEXTURE_COUNT, "TextureCount" },
     { IDS_TESSELATION, "Tesselation" },
     { IDS_TEXTURE,     "Texture" },
-    { IDS_TEXTURE_FILE_OFFSET, "TexOffset" },
+    { IDS_TEXTURE_FILE_OFFSET, "TextureFileOffset" },
+    /* texture-processing strings from COMMON/SSCOMMON.RC */
+    { IDS_WARNING,     "Warning" },
+    { IDS_ERROR,       "Error" },
+    { IDS_BITMAP_SIZE, "The texture must not be larger than %ld by %ld pixels." },
+    { IDS_BITMAP_INVALID, "The texture you selected is not valid." },
+    { IDS_SELECT_ANOTHER_BITMAP,
+      "Please select another texture for the screen saver.  %s is not valid." },
+    { IDS_START_FAILED, "Screen saver failed to start." },
+    { IDS_TEXTUREFILTER, "Texture files (*.bmp)" },
+    { IDS_TEXTUREDIALOGTITLE, "Choose Texture File" },
+    { IDS_BMP,         "BMP" },
+    { IDS_DOTBMP,      ".BMP" },
+    { IDS_STARDOTBMP,  "*.BMP" },
+    { IDS_RGB,         "RGB" },
+    { IDS_DOTRGB,      ".RGB" },
+    { IDS_STARDOTRGB,  "*.RGB" },
 };
 
 int LoadStringA(HINSTANCE hinst, UINT id, char *buf, int bufMax)
@@ -284,16 +315,32 @@ DWORD SizeofResource(HMODULE mod, HRSRC res)
 DWORD SearchPathA(const char *path, const char *file, const char *ext,
                   DWORD buflen, char *buf, char **filepart)
 {
-    /* User texture files are looked up in the (MEMFS) filesystem. */
-    (void)path; (void)ext; (void)filepart;
+    /* User texture files are looked up in the (MEMFS) filesystem.
+     * Win32 SearchPath returns an ABSOLUTE path and points *filepart at
+     * the filename inside the buffer; TEXTURE.C's ss_VerifyTextureFile
+     * derives a nonzero nOffset from that (TEXTURE.C:801), so both
+     * behaviors must be reproduced. */
+    (void)path; (void)ext;
     if (!file || !file[0])
         return 0;
     FILE *f = fopen(file, "rb");
     if (!f)
         return 0;
     fclose(f);
-    strncpy(buf, file, buflen - 1);
-    buf[buflen - 1] = '\0';
+    if (file[0] == '/') {
+        strncpy(buf, file, buflen - 1);
+        buf[buflen - 1] = '\0';
+    } else {
+        char cwd[MAX_PATH];
+        if (!getcwd(cwd, sizeof(cwd)))
+            strcpy(cwd, "/");
+        snprintf(buf, buflen, "%s%s%s", cwd,
+                 (cwd[strlen(cwd) - 1] == '/') ? "" : "/", file);
+    }
+    if (filepart) {
+        char *slash = strrchr(buf, '/');
+        *filepart = slash ? slash + 1 : buf;
+    }
     return (DWORD)strlen(buf);
 }
 
@@ -351,6 +398,8 @@ BOOL ss_DIBImageLoad(PVOID pvFile, TEXTURE_SH *ptex)
     int bpp = bi->biBitCount;
     if (w <= 0 || h <= 0)
         return FALSE;
+    if (bpp != 1 && bpp != 4 && bpp != 8 && bpp != 24 && bpp != 32)
+        return FALSE;   /* 16bpp etc.: fail -> default-texture fallback */
 
     int palCount = 0;
     const RGBQUAD *pal = (const RGBQUAD *)((const unsigned char *)bi + bi->biSize);
@@ -532,7 +581,7 @@ EM_JS(int, create_gl_context, (void), {
 EM_JS(int, apply_js_config, (void), {
     var cfg = (typeof window !== 'undefined' && window.PIPES_CONFIG) || {};
     var names = ['JointType','SurfStyle','TextureQuality','Tesselation',
-                 'Flex','MultiPipes','TextureCount'];
+                 'Flex','MultiPipes','TextureFileOffset'];
     for (var i = 0; i < names.length; i++) {
         if (typeof cfg[names[i]] === 'number') {
             var n = stringToNewUTF8(names[i]);
